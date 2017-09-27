@@ -1,0 +1,48 @@
+.TH mem-reserve 1 "Memory Reservation Calculator"
+.SH NAME
+mem-reserve \- Memory Reservation Calculator
+.SH SYNOPSYS
+.B mem-reserve [--help] [--show] [--reserve BYTES]
+.SH DESCRIPTION
+.B Mem-reserve
+takes the current machine configuration and computes the kernel
+parameter necessary to reserve a chunk of memory from use by the
+kernel. It selects memory at the top of the physical memory map.
+.SH OPTIONS
+.PP
+.B -h, --help
+.RS 4
+Prints a summary of the command line options
+.RE
+.PP
+.B -s, --show
+.RS 4
+Displays the current memory configuration, including the physical
+memory, memory usage by the kernel and reserved memory.
+.RE
+.PP
+.B -r BYTES, --reserve BYTES
+.RS 4
+Computes the kernel parameters necessary to reserve BYTES memory at
+the top of the physical memory map. BYTES may be suffixed with P, T,
+G, M or K to indicate a scaling factor.
+.RE
+.SH EXAMPLES
+.TP
+mem-reserve --show
+.TP
+mem-reserve --reserve 4T
+.SH AUTHOR
+.B Mem-reserve
+was written by Keith Packard <packard@hpe.com> and
+is Copyright 2017 Keith Packard.
+.PP
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation, either version 3 of
+the License, or (at your option) any later version.
+.PP
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.

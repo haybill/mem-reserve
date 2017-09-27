@@ -8,5 +8,6 @@ setup(name='mem-reserve',
       author='Keith Packard',
       author_email='keithp@keithp.com',
       url='https://github.com/FabricAttachedMemory/mem-reserve',
-      scripts=['mem-reserve']
+      scripts=['mem-reserve'],
+      data_files=[('share/man/man1', ['mem-reserve.1'])]
      )
