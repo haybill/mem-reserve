@@ -1,0 +1,201 @@
+#!/usr/bin/python3
+
+import os
+import re
+import argparse
+
+firmware_dir='/sys/firmware/memmap'
+os_dir='/sys/devices/system/memory'
+
+class Mem:
+        start = 0
+        end = 0
+
+        def __init__(self, start, end):
+                self.start = start
+                self.end = end
+
+        def size(self):
+                return self.end - self.start
+
+        def copy(self):
+                return Mem(self.start, self.end)
+
+        def print(self):
+                print("%012x %012x" % (self.start, self.end), end='')
+
+def Start(m):
+        return m.start
+
+def Reverse(m):
+        return -m.start
+
+# Read an integer out of a file
+def read_int(filename, base):
+        with open(filename, 'r') as f:
+                for line in f:
+                        return int(line, base)
+
+def firmware_mem(dirname):
+        return Mem(read_int(dirname + '/start', 0), read_int(dirname + '/end', 0) + 1)
+
+def firmware_mem_type(dirname):
+        with open (dirname + '/type', 'r') as f:
+                for line in f:
+                        return line.strip()
+
+# Given a set of ranges, merge adjacent ranges
+def merge_mem(mems):
+        mems = sorted(mems, key=Start)
+        new_mems=[]
+        last_mem=None
+        for mem in mems:
+                if last_mem is None:
+                        last_mem=mem
+                else:
+                        if last_mem.end == mem.start:
+                                last_mem.end = mem.end
+                        else:
+                                new_mems += [last_mem]
+                                last_mem = mem
+        if not last_mem is None:
+                new_mems += [last_mem]
+        return new_mems
+
+# Compute intersection between two ranges, None if there is no overlap
+def intersect(a, b):
+        if a.end <= b.start:
+                return None
+        if b.end <= a.start:
+                return None
+        return Mem(max(a.start,b.start), min(a.end,b.end))
+
+# Compute intersection between two sets of ranges, empty if there is no overlap
+def intersect_mem(a_s, b_s):
+        new_mems=[]
+        for a in a_s:
+                for b in b_s:
+                        n = intersect(a,b)
+                        if not n is None:
+                                new_mems += [n]
+        return merge_mem(new_mems)
+
+# Compute difference between two sets of ranges, empty if b_s completely covers a_s
+def subtract_mem(a_s, b_s):
+        new_mems = a_s.copy()
+        for b in b_s:
+                temp_mems = new_mems.copy()
+                for a in temp_mems:
+                        i = intersect(a, b)
+                        if not i is None:
+                                new_mems.remove(a)
+                                first=None
+                                second=None
+                                if i.start == a.start:
+                                        if i.end != a.end:
+                                                new_mems += [Mem(i.end, a.end)]
+                                elif i.end == a.end:
+                                        new_mems += [Mem(a.start, i.start)]
+                                else:
+                                        new_mems += [Mem(a.start, i.start)]
+                                        new_mems += [Mem(i.end,a.end)]
+        return merge_mem(new_mems)
+
+# Fetch firmware memory map
+def firmwares():
+        mems=[]
+        for dir in os.listdir(firmware_dir):
+                type = firmware_mem_type(firmware_dir + '/' + dir)
+                if type == 'System RAM':
+                        mems = mems + [firmware_mem(firmware_dir + '/' + dir)]
+        return merge_mem(mems)
+
+# Fetch OS memory map
+def oses():
+        mems=[]
+        size=read_int(os_dir + '/block_size_bytes', 16)
+        for dir in os.listdir(os_dir):
+                if re.match("memory[0-9][0-9]*", dir):
+                        start=read_int(os_dir + '/' + dir + '/phys_index', 16) * size
+                        end=start + size
+                        mems = mems + [Mem(start,end)]
+        return merge_mem(mems)
+
+def system_map():
+        return intersect_mem(oses(), firmwares())
+
+def librarian_map():
+        return subtract_mem(firmwares(), oses())
+
+def reserve_map(reserve):
+        fs_reverse = firmwares()
+        fs_reverse.reverse()
+        reserve_mems=[]
+        for f in fs_reverse:
+                if reserve == 0:
+                        break;
+                if reserve >= f.size():
+                        reserve_mems += [f.copy()]
+                        reserve -= f.size()
+                else:
+                        reserve_mems += [Mem(f.end - reserve, f.end)]
+                        reserve = 0
+        return merge_mem(reserve_mems)
+
+def print_mems(name, ms):
+        print("%s: " % name)
+        for m in ms:
+                print("\t", end='')
+                m.print()
+                print()
+
+def show():
+        print_mems("Firmware", firmwares())
+        print()
+        print_mems("System", system_map())
+        print()
+        print_mems("Librarian", librarian_map())
+
+def reserve(size):
+        rs = reserve_map(size)
+        systems = subtract_mem(firmwares(), rs)
+
+        print("Kernel: (remember to add \\ before $ for grub)")
+        total=0
+        for r in rs:
+                print(" memmap=0x%0x$0x%0x" % (r.end - r.start, r.start), end='')
+                total += r.end - r.start
+        print()
+        print()
+        print("Librarian range:")
+        for r in rs:
+                print(" 0x%x - 0x%x" % (r.start, r.end))
+        print()
+        print("Memory reserved: %fG" % (total / (1024.0 * 1024.0 * 1024.0)))
+
+def parse_size(s):
+        m = re.match("([0-9]+)([pPtTgGmMkKbB]?)", s)
+        if m is None:
+                return 0
+        value = int(m.group(1))
+        unit = m.group(2).lower()
+        if unit == 'p':
+                value *= 1024 * 1024 * 1024 * 1024 * 1024
+        elif unit == 't':
+                value *= 1024 * 1024 * 1024 * 1024
+        elif unit == 'g':
+                value *= 1024 * 1024 * 1024
+        elif unit == 'm':
+                value *= 1024 * 1024
+        elif unit == 'k':
+                value *= 1024
+        return value
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-s", "--show", help="Show current configuration", action="store_true")
+parser.add_argument("-r", "--reserve", help="Reserve memory (may be followed by P, T, G, B or K)")
+args = parser.parse_args()
+if args.show:
+        show()
+if args.reserve:
+        reserve(parse_size(args.reserve))
