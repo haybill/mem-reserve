@@ -1,4 +1,21 @@
 #!/usr/bin/python3
+#
+# Copyright © 2017 Keith Packard <keithp@keithp.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+#
 
 import os
 import re
@@ -124,10 +141,10 @@ def oses():
 def system_map():
         return intersect_mem(oses(), firmwares())
 
-def librarian_map():
+def reserve_map():
         return subtract_mem(firmwares(), oses())
 
-def reserve_map(reserve):
+def make_reserve_map(reserve):
         fs_reverse = firmwares()
         fs_reverse.reverse()
         reserve_mems=[]
@@ -154,10 +171,10 @@ def show():
         print()
         print_mems("System", system_map())
         print()
-        print_mems("Librarian", librarian_map())
+        print_mems("Reserve", reserve_map())
 
 def reserve(size):
-        rs = reserve_map(size)
+        rs = make_reserve_map(size)
         systems = subtract_mem(firmwares(), rs)
 
         print("Kernel: (remember to add \\ before $ for grub)")
