@@ -1,0 +1,23 @@
+Source: mem-reserve
+Section: misc
+Priority: optional
+Maintainer: Keith Packard <packard@hpe.com>
+Uploaders: Keith Packard <keithp@keithp.com>
+Origin: HPE
+Build-Depends: debhelper (>= 9),
+	python-minimal,
+	dh-python,
+	dh-exec,
+	python,
+	python3 (>= 3.2)
+Standards-Version: 4.0.0
+X-Python3-Version: >= 3.2
+XS-Python-Version: all
+
+Package: mem-reserve
+Architecture: all
+Depends: python3 (>= 3.2),
+	${python3:Depends},
+	${misc:Depends}
+Description: Memory reservation calculator
+ Compute kernel and librarian parameters for memory reservations

@@ -1,0 +1,5 @@
+mem-reserve (1.0-1) unstable; urgency=medium
+
+  * Initial release
+
+ -- Keith Packard <keithp@keithp.com>  Wed, 27 Sep 2017 15:55:58 -0700
