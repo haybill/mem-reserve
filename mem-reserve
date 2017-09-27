@@ -184,7 +184,7 @@ def reserve(size):
                 total += r.end - r.start
         print()
         print()
-        print("Librarian range:")
+        print("Reserved:")
         for r in rs:
                 print(" 0x%x - 0x%x" % (r.start, r.end))
         print()
