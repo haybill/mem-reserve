@@ -23,6 +23,13 @@ import argparse
 
 firmware_dir='/sys/firmware/memmap'
 os_dir='/sys/devices/system/memory'
+blocksize_file=os_dir + '/block_size_bytes'
+
+def round_up(v, align):
+        return int((v + align-1) / align) * align
+
+def round_down(v, align):
+        return int(v / align) * align
 
 class Mem:
         start = 0
@@ -37,6 +44,9 @@ class Mem:
 
         def copy(self):
                 return Mem(self.start, self.end)
+
+        def align(self, align):
+                return Mem(round_up(self.start, align), round_down(self.end, align))
 
         def print(self):
                 print("%012x %012x" % (self.start, self.end), end='')
@@ -138,6 +148,10 @@ def oses():
                         mems = mems + [Mem(start,end)]
         return merge_mem(mems)
 
+def block_size():
+        size=read_int(blocksize_file, 16)
+        return size
+
 def system_map():
         return intersect_mem(oses(), firmwares())
 
@@ -148,14 +162,18 @@ def make_reserve_map(reserve):
         fs_reverse = firmwares()
         fs_reverse.reverse()
         reserve_mems=[]
+        size = block_size()
+        reserve = round_up(reserve, size)
         for f in fs_reverse:
                 if reserve == 0:
                         break;
-                if reserve >= f.size():
-                        reserve_mems += [f.copy()]
-                        reserve -= f.size()
+                t = f.align(size)
+
+                if reserve >= t.size():
+                        reserve_mems += [t.copy()]
+                        reserve -= t.size()
                 else:
-                        reserve_mems += [Mem(f.end - reserve, f.end)]
+                        reserve_mems += [Mem(t.end - reserve, t.end)]
                         reserve = 0
         return merge_mem(reserve_mems)
 
