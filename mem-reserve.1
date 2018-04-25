@@ -2,7 +2,7 @@
 .SH NAME
 mem-reserve \- Memory Reservation Calculator
 .SH SYNOPSYS
-.B mem-reserve [--help] [--show] [--reserve BYTES]
+.B mem-reserve [--help] [--show] [--reserve BYTES] [--bsize BYTES]
 .SH DESCRIPTION
 .B Mem-reserve
 takes the current machine configuration and computes the kernel
@@ -27,11 +27,19 @@ Computes the kernel parameters necessary to reserve BYTES memory at
 the top of the physical memory map. BYTES may be suffixed with P, T,
 G, M or K to indicate a scaling factor.
 .RE
+.PP
+.B -b BYTES, --bsize BYTES
+.RS 4
+Show LFS cfg declarations for given book size. BYTES may be suffixed
+with P, T, G, M or K to indicate a scaling factor.
+.RE
 .SH EXAMPLES
 .TP
 mem-reserve --show
 .TP
 mem-reserve --reserve 4T
+.TP
+mem-reserve --bsize 8G
 .SH AUTHOR
 .B Mem-reserve
 was written by Keith Packard <packard@hpe.com> and

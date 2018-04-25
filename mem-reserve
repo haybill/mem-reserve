@@ -23,6 +23,13 @@ import argparse
 
 firmware_dir='/sys/firmware/memmap'
 os_dir='/sys/devices/system/memory'
+blocksize_file=os_dir + '/block_size_bytes'
+
+def round_up(v, align):
+        return int((v + align-1) / align) * align
+
+def round_down(v, align):
+        return int(v / align) * align
 
 class Mem:
         start = 0
@@ -37,6 +44,9 @@ class Mem:
 
         def copy(self):
                 return Mem(self.start, self.end)
+
+        def align(self, align):
+                return Mem(round_up(self.start, align), round_down(self.end, align))
 
         def print(self):
                 print("%012x %012x" % (self.start, self.end), end='')
@@ -78,6 +88,13 @@ def merge_mem(mems):
         if not last_mem is None:
                 new_mems += [last_mem]
         return new_mems
+
+# Given a set of ranges, return the total memory
+def total_mem(mems):
+        total = 0
+        for mem in mems:
+                total = total + mem.size()
+        return total
 
 # Compute intersection between two ranges, None if there is no overlap
 def intersect(a, b):
@@ -138,6 +155,10 @@ def oses():
                         mems = mems + [Mem(start,end)]
         return merge_mem(mems)
 
+def block_size():
+        size=read_int(blocksize_file, 16)
+        return size
+
 def system_map():
         return intersect_mem(oses(), firmwares())
 
@@ -148,23 +169,27 @@ def make_reserve_map(reserve):
         fs_reverse = firmwares()
         fs_reverse.reverse()
         reserve_mems=[]
+        size = block_size()
+        reserve = round_up(reserve, size)
         for f in fs_reverse:
                 if reserve == 0:
                         break;
-                if reserve >= f.size():
-                        reserve_mems += [f.copy()]
-                        reserve -= f.size()
+                t = f.align(size)
+
+                if reserve >= t.size():
+                        reserve_mems += [t.copy()]
+                        reserve -= t.size()
                 else:
-                        reserve_mems += [Mem(f.end - reserve, f.end)]
+                        reserve_mems += [Mem(t.end - reserve, t.end)]
                         reserve = 0
         return merge_mem(reserve_mems)
 
 def print_mems(name, ms):
-        print("%s: " % name)
+        print("%s: %s" % (name, add_suffix(total_mem(ms))))
         for m in ms:
                 print("\t", end='')
                 m.print()
-                print()
+                print(" %s" % add_suffix(m.size()))
 
 def show():
         print_mems("Firmware", firmwares())
@@ -173,22 +198,38 @@ def show():
         print()
         print_mems("Reserve", reserve_map())
 
-def reserve(size):
+def reserve(size, bsize):
         rs = make_reserve_map(size)
         systems = subtract_mem(firmwares(), rs)
 
         print("Kernel: (remember to add \\ before $ for grub)")
         total=0
         for r in rs:
-                print(" memmap=0x%0x$0x%0x" % (r.end - r.start, r.start), end='')
+                print(" memmap=0x%0x$0x%0x" % (r.end - r.start, r.start))
+
+                if bsize:
+                        # Determine books that will fit in memory chunk
+                        ba_start = align_up(bsize, r.start)
+                        ba_size = r.end - ba_start
+                        book_cnt = 0
+
+                        while ba_size >= bsize:
+                                book_cnt += 1
+                                ba_size -= bsize
+
+                        if book_cnt:
+                                print(" nvm_size = %dB @ 0x%x" %
+                                        (book_cnt, ba_start), end='')
+                                print("   # book_size = %s, total nvm = %s" %
+                                        (add_suffix(bsize), add_suffix(bsize*book_cnt)))
+
                 total += r.end - r.start
-        print()
         print()
         print("Reserved:")
         for r in rs:
                 print(" 0x%x - 0x%x" % (r.start, r.end))
         print()
-        print("Memory reserved: %fG" % (total / (1024.0 * 1024.0 * 1024.0)))
+        print("Memory reserved: %s" % add_suffix(total))
 
 def parse_size(s):
         m = re.match("([0-9]+)([pPtTgGmMkKbB]?)", s)
@@ -208,11 +249,63 @@ def parse_size(s):
                 value *= 1024
         return value
 
+def add_suffix(s):
+
+        p_val = 1024 * 1024 * 1024 * 1024 * 1024
+        t_val = 1024 * 1024 * 1024 * 1024
+        g_val = 1024 * 1024 * 1024
+        m_val = 1024 * 1024
+        k_val = 1024
+
+        value = float(s)
+
+        if s / p_val >= 1:
+                unit = 'P'
+                value /= p_val
+
+        elif s / t_val >= 1:
+                unit = 'T'
+                value /= t_val
+
+        elif s / g_val >= 1:
+                unit = 'G'
+                value /= g_val
+
+        elif s / m_val >= 1:
+                unit = 'M'
+                value /= m_val
+
+        elif s / k_val >= 1:
+                unit = 'K'
+                value /= k_val
+
+        else:
+                unit = ''
+
+        ret = round(value, 2)
+        return str(ret) + unit
+
+def align_up(bsize, addr):
+        # Round up address to book size alignment if not aligned already
+        return (((bsize - ((addr + bsize) % bsize)) % bsize) + addr)
+
 parser = argparse.ArgumentParser()
-parser.add_argument("-s", "--show", help="Show current configuration", action="store_true")
-parser.add_argument("-r", "--reserve", help="Reserve memory (may be followed by P, T, G, B or K)")
+parser.add_argument(
+        "-s",
+        "--show",
+        help="Show current configuration", action="store_true")
+parser.add_argument(
+        "-r",
+        "--reserve",
+        help="Reserve memory (may be followed by P, T, G, B or K)")
+parser.add_argument(
+        "-b",
+        "--bsize",
+        default="0",
+        help="Show LFS cfg declarations for given book size (may be followed by P, T, G, B or K)")
 args = parser.parse_args()
 if args.show:
         show()
 if args.reserve:
-        reserve(parse_size(args.reserve))
+        reserve(parse_size(args.reserve), parse_size(args.bsize))
+
