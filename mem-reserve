@@ -89,6 +89,13 @@ def merge_mem(mems):
                 new_mems += [last_mem]
         return new_mems
 
+# Given a set of ranges, return the total memory
+def total_mem(mems):
+        total = 0
+        for mem in mems:
+                total = total + mem.size()
+        return total
+
 # Compute intersection between two ranges, None if there is no overlap
 def intersect(a, b):
         if a.end <= b.start:
@@ -178,11 +185,11 @@ def make_reserve_map(reserve):
         return merge_mem(reserve_mems)
 
 def print_mems(name, ms):
-        print("%s: " % name)
+        print("%s: %s" % (name, add_suffix(total_mem(ms))))
         for m in ms:
                 print("\t", end='')
                 m.print()
-                print()
+                print(" %s" % add_suffix(m.size()))
 
 def show():
         print_mems("Firmware", firmwares())
@@ -222,7 +229,7 @@ def reserve(size, bsize):
         for r in rs:
                 print(" 0x%x - 0x%x" % (r.start, r.end))
         print()
-        print("Memory reserved: %fG" % (total / (1024.0 * 1024.0 * 1024.0)))
+        print("Memory reserved: %s" % add_suffix(total))
 
 def parse_size(s):
         m = re.match("([0-9]+)([pPtTgGmMkKbB]?)", s)
