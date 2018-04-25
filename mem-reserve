@@ -297,7 +297,6 @@ parser.add_argument(
 parser.add_argument(
         "-r",
         "--reserve",
-        default="1024P",
         help="Reserve memory (may be followed by P, T, G, B or K)")
 parser.add_argument(
         "-b",
