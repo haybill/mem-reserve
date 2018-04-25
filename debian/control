@@ -9,6 +9,7 @@ Build-Depends: debhelper (>= 9),
 	dh-python,
 	dh-exec,
 	python,
+	python3-distutils,
 	python3 (>= 3.2)
 Standards-Version: 4.0.0
 
