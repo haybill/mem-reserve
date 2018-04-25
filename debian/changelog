@@ -1,3 +1,10 @@
+mem-reserve (1.1-1) unstable; urgency=medium
+
+  * Add -b option to print out LFS params
+  * Round reservations to memory block size
+
+ -- Keith Packard <keithp@keithp.com>  Wed, 25 Apr 2018 15:17:37 -0700
+
 mem-reserve (1.0-1) unstable; urgency=medium
 
   * Initial release
